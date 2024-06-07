@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Emotion Based Song Recommendation</title>
+    <style>
+        #image-container {
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        #image-container img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        #predicted-class {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background-color: white;
+            padding: 5px;
+            font-weight: bold;
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <h1>Upload a Photo for Emotion Recognition</h1>
+    <form id="upload-form" enctype="multipart/form-data">
+        <label for="uploadInput">Choose an image:</label>
+        <input id="uploadInput" type="file" required/>
+        <input type="submit" value="Upload and Predict">
+    </form>
+    <div id="image-container"></div>
+    <div id="songs-container"></div>
+
+    <script>
+        document.getElementById('upload-form').addEventListener('submit', async function(event) {
+            event.preventDefault();
+            const formData = new FormData();
+            const fileInput = document.getElementById("uploadInput");
+            const file = fileInput.files[0];
+
+            formData.append('file', file);
+
+            const response = await fetch('/predict', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+            const songsContainer = document.getElementById('songs-container');
+            songsContainer.innerHTML = ''; // Clear previous results
+
+            // Create image element and display it along with predicted class
+            const imageContainer = document.getElementById('image-container');
+            imageContainer.innerHTML = ''; // Clear previous image
+            const img = document.createElement('img');
+            img.src = 'data:image/jpeg;base64,' + result.image;
+            img.alt = 'Uploaded Image';
+
+            // Create a div element for predicted class
+            const predictedClassDiv = document.createElement('div');
+            predictedClassDiv.id = 'predicted-class';
+            predictedClassDiv.textContent = 'You are feeling: ' + result.class;
+
+            // Append the image and predicted class div to the image container
+            imageContainer.appendChild(img);
+            imageContainer.appendChild(predictedClassDiv);
+
+            if (result.songs && result.songs.length > 0) {
+                const title = document.createElement('h2');
+                title.textContent = 'Recommended Songs';
+                songsContainer.appendChild(title);
+
+                const songsList = document.createElement('ul');
+                result.songs.forEach(song => {
+                    const li = document.createElement('li');
+                    li.textContent = song;
+                    songsList.appendChild(li);
+                });
+                songsContainer.appendChild(songsList);
+            } else {
+                const noSongsMessage = document.createElement('p');
+                noSongsMessage.textContent = 'No songs to recommend.';
+                songsContainer.appendChild(noSongsMessage);
+            }
+        });
+    </script>
+</body>
+</html>
