@@ -6,8 +6,7 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            background: url('E:/UNIPG/app_from0/templates/93185.jpg') no-repeat center center fixed;
-            /* background image not working, deal later */
+            background: url('93185.jpg') no-repeat center center fixed;
             background-size: cover;
             color: #333;
             margin: 0;
@@ -15,13 +14,13 @@
         }
         h1 {
             text-align: center;
-            background-color: #1e90ff;
+            background-color: #2d7fd0;
             color: white;
             padding: 20px 0;
             margin: 0;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-        #upload-form {
+        #upload-form, #capture-form {
             max-width: 600px;
             margin: 20px auto;
             padding: 20px;
@@ -29,15 +28,15 @@
             border-radius: 10px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
-        label, input[type="submit"] {
+        label, input[type="submit"], button {
             display: block;
             width: 100%;
             margin-bottom: 10px;
         }
-        #uploadInput {
+        #uploadInput, #captureButton {
             margin-bottom: 20px;
         }
-        input[type="submit"] {
+        input[type="submit"], button {
             background-color: #1e90ff;
             color: white;
             padding: 10px;
@@ -48,11 +47,11 @@
             transition: all 0.3s ease;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
-        input[type="submit"]:hover {
+        input[type="submit"]:hover, button:hover {
             background-color: #187bcd;
             box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
         }
-        input[type="submit"]:active {
+        input[type="submit"]:active, button:active {
             background-color: #145a9c;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
             transform: translateY(2px);
@@ -106,6 +105,10 @@
             height: 24px;
             margin-right: 10px;
         }
+        #video {
+            display: block;
+            margin: 0 auto;
+        }
     </style>
 </head>
 <body>
@@ -115,12 +118,95 @@
         <input id="uploadInput" type="file" required/>
         <input type="submit" value="Upload and Predict">
     </form>
+    <form id="capture-form">
+        <video id="video" width="600" height="400" autoplay></video>
+        <button type="button" id="captureButton">Capture and Predict</button>
+    </form>
+    <canvas id="canvas" style="display: none;"></canvas>
     <div id="image-container"></div>
     <div id="songs-container"></div>
 
     <script>
+        const video = document.getElementById('video');
+        const captureButton = document.getElementById('captureButton');
+        const canvas = document.getElementById('canvas');
+        const imageContainer = document.getElementById('image-container');
+        const songsContainer = document.getElementById('songs-container');
+
+        // Access the webcam
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
+                video.srcObject = stream;
+                video.play();
+            });
+        }
+
+        // Capture the image from the webcam
+        captureButton.addEventListener('click', async function() {
+            // Clear previous results
+            imageContainer.innerHTML = '';
+            songsContainer.innerHTML = '';
+
+            const context = canvas.getContext('2d');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            canvas.toBlob(async function(blob) {
+                const formData = new FormData();
+                formData.append('file', blob, 'capture.jpg');
+
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                // Display the captured image
+                const img = document.createElement('img');
+                img.src = 'data:image/jpeg;base64,' + result.image;
+                img.alt = 'Captured Image';
+
+                // Create a div element for predicted class
+                const predictedClassDiv = document.createElement('div');
+                predictedClassDiv.id = 'predicted-class';
+                predictedClassDiv.textContent = 'You are feeling: ' + result.class;
+
+                // Append the image and predicted class div to the image container
+                imageContainer.appendChild(img);
+                imageContainer.appendChild(predictedClassDiv);
+
+                if (result.songs && result.songs.length > 0) {
+                    const title = document.createElement('h2');
+                    title.textContent = 'Recommended Songs';
+                    songsContainer.appendChild(title);
+
+                    const songsList = document.createElement('ul');
+                    result.songs.forEach(song => {
+                        const li = document.createElement('li');
+                        const icon = document.createElement('img');
+                        icon.src = 'https://img.icons8.com/ios-filled/50/000000/musical-notes.png';
+                        icon.alt = 'Music Icon';
+                        li.appendChild(icon);
+                        li.appendChild(document.createTextNode(song));
+                        songsList.appendChild(li);
+                    });
+                    songsContainer.appendChild(songsList);
+                } else {
+                    const noSongsMessage = document.createElement('p');
+                    noSongsMessage.textContent = 'No songs to recommend.';
+                    songsContainer.appendChild(noSongsMessage);
+                }
+            }, 'image/jpeg');
+        });
+
         document.getElementById('upload-form').addEventListener('submit', async function(event) {
             event.preventDefault();
+            // Clear previous results
+            imageContainer.innerHTML = '';
+            songsContainer.innerHTML = '';
+
             const formData = new FormData();
             const fileInput = document.getElementById("uploadInput");
             const file = fileInput.files[0];
@@ -133,12 +219,8 @@
             });
 
             const result = await response.json();
-            const songsContainer = document.getElementById('songs-container');
-            songsContainer.innerHTML = ''; // Clear previous results
 
             // Create image element and display it along with predicted class
-            const imageContainer = document.getElementById('image-container');
-            imageContainer.innerHTML = ''; // Clear previous image
             const img = document.createElement('img');
             img.src = 'data:image/jpeg;base64,' + result.image;
             img.alt = 'Uploaded Image';
