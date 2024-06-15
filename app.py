@@ -7,6 +7,7 @@ import tensorflow as tf
 import os
 import matplotlib.pyplot as plt
 import io
+import json
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 # Change the working directory to the script's directory
@@ -24,7 +25,7 @@ app = Flask(__name__)
 class_names = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
 
 # Function to recommend songs
-def Recommend_Songs(pred_class):
+def Recommend_Songs(pred_class, genre):
     if pred_class == 'Disgust':
         Play = Music_Player[Music_Player['mood'] == 'Sad']
     elif pred_class in ['Happy', 'Sad']:
@@ -35,8 +36,15 @@ def Recommend_Songs(pred_class):
         Play = Music_Player[Music_Player['mood'] == 'Energetic']
     
     Play = Play.sort_values(by="popularity", ascending=False)
+    if genre != '':
+        mask = pd.notna(Play['genres'])
+        filtered_data = Play[mask]
+        filtered_data = filtered_data[filtered_data['genres'].str.contains(genre)]
+        filtered_data = filtered_data[:5].reset_index(drop=True)
+        #return filtered_data[['name', 'genres']]
+        return filtered_data[['name', 'genres']]
     Play = Play[:5].reset_index(drop=True)
-    return Play['name'].tolist()
+    return Play[['name', 'genres']]
 
 # Function to load and prepare the image
 faceCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
@@ -85,13 +93,13 @@ def load_and_prep_image(image_stream, img_shape=224):
     return RGBImg, img_base64
 
 # Function to predict and recommend songs
-def pred_and_recommend(image_file, class_names):
+def pred_and_recommend(image_file, class_names, genre):
     img, img_base64 = load_and_prep_image(image_file)
     if img is None:
         return None, None
     pred = ResNet50V2_Model.predict(np.expand_dims  (img, axis=0))
     pred_class = class_names[pred.argmax()]
-    songs = Recommend_Songs(pred_class)
+    songs = Recommend_Songs(pred_class, genre)
     # Encode the image to base64 string
     #_, img_encoded = cv2.imencode('.jpg', original_img)
     #img_base64 = base64.b64encode(img_encoded).decode('utf-8')
@@ -104,16 +112,23 @@ def index():
 @app.route('/predict', methods=['POST'])
 def predict():
     image_file = request.files['file']
+    genre = request.form.get('genre')
     #filepath = f'{file.filename}'
     #print(filepath)
     #filepath = f'static/{file.filename}'
     #file.save(filepath)
     
-    pred_class, songs, img_base64 = pred_and_recommend(image_file.stream, class_names)
+    pred_class, songs, img_base64 = pred_and_recommend(image_file.stream, class_names, genre)
+    # Convert songs DataFrame to a list of dictionaries
+    if songs is not None and not songs.empty:
+        songs_list = songs.to_dict(orient='records')
+    else:
+        songs_list = []
+    songs_json = json.dumps(songs_list)
         #if pred_class is None:
     #    return jsonify({'songs': []})
     #return jsonify({'songs': songs})
-    return jsonify({'class': pred_class, 'songs': songs, 'image': img_base64})
+    return jsonify({'class': pred_class, 'songs': songs_json, 'image': img_base64})
 
 if __name__ == '__main__':
     app.run(debug=True)
