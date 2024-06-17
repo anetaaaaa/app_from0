@@ -7,7 +7,16 @@ import tensorflow as tf
 import os
 import matplotlib.pyplot as plt
 import io
-import json
+# Import Spotify credentials from config.py
+from config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET
+import requests
+
+# Suppress TensorFlow logging
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
+# Use a non-interactive backend for Matplotlib
+import matplotlib
+matplotlib.use('Agg')
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 # Change the working directory to the script's directory
@@ -19,10 +28,42 @@ ResNet50V2_Model = tf.keras.models.load_model('ResNet50V2_Model.h5')
 Music_Player = pd.read_csv('data_moods2.csv')
 
 # Define the Flask app
-app = Flask(__name__)
+app = Flask(__name__, static_url_path='/static')
 
 # Class names for the prediction
 class_names = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
+
+# Get Spotify access token
+def get_spotify_token():
+    auth_url = 'https://accounts.spotify.com/api/token'
+    auth_header = {
+        'Authorization': 'Basic ' + base64.b64encode((SPOTIFY_CLIENT_ID + ':' + SPOTIFY_CLIENT_SECRET).encode()).decode('utf-8'),
+    }
+    auth_data = {
+        'grant_type': 'client_credentials',
+    }
+    response = requests.post(auth_url, headers=auth_header, data=auth_data)
+    response_data = response.json()
+    return response_data['access_token']
+
+# Function to search for songs on Spotify
+def search_spotify(song_name, token):
+    search_url = 'https://api.spotify.com/v1/search'
+    headers = {
+        'Authorization': f'Bearer {token}',
+    }
+    params = {
+        'q': song_name,
+        'type': 'track',
+        'limit': 1,
+    }
+    response = requests.get(search_url, headers=headers, params=params)
+    response_data = response.json()
+    if response_data['tracks']['items']:
+        return response_data['tracks']['items'][0]['external_urls']['spotify']
+    else:
+        return None
+
 
 # Function to recommend songs
 def Recommend_Songs(pred_class, genre):
@@ -36,15 +77,14 @@ def Recommend_Songs(pred_class, genre):
         Play = Music_Player[Music_Player['mood'] == 'Energetic']
     
     Play = Play.sort_values(by="popularity", ascending=False)
-    if genre != '':
-        mask = pd.notna(Play['genres'])
-        filtered_data = Play[mask]
-        filtered_data = filtered_data[filtered_data['genres'].str.contains(genre)]
-        filtered_data = filtered_data[:5].reset_index(drop=True)
-        #return filtered_data[['name', 'genres']]
-        return filtered_data[['name', 'genres']]
-    Play = Play[:5].reset_index(drop=True)
-    return Play[['name', 'genres']]
+    if genre == '' or genre is None:
+        Play = Play[:5].reset_index(drop=True)
+        return Play['name'].tolist()
+    mask = pd.notna(Play['genres'])
+    filtered_data = Play[mask]
+    filtered_data = filtered_data[filtered_data['genres'].str.contains(genre)]
+    filtered_data = filtered_data[:5].reset_index(drop=True)
+    return filtered_data['name'].tolist()
 
 # Function to load and prepare the image
 faceCascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
@@ -58,18 +98,22 @@ def load_and_prep_image(image_stream, img_shape=224):
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     
     if img is None:
-        return None
-    #img = cv2.imread(image_file)
+        print("Failed to decode image")
+        return None, None
+    
     GrayImg = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = faceCascade.detectMultiScale(GrayImg, 1.1, 4)
+
+    if len(faces) == 0:
+        print("No faces detected")
+        return None, None
 
     for x, y, w, h in faces:
         roi_GrayImg = GrayImg[y: y + h, x: x + w]
         roi_Img = img[y: y + h, x: x + w]
         cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
         
-
-    # Plot the image with matplotlib and convert it to base64
+        # Plot the image with matplotlib and convert it to base64
         fig, ax = plt.subplots()
         ax.imshow(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))  # Convert BGR to RGB
         ax.axis('off')
@@ -80,30 +124,32 @@ def load_and_prep_image(image_stream, img_shape=224):
         buf.seek(0)
         img_base64 = base64.b64encode(buf.read()).decode('utf-8')
 
-        faces = faceCascade.detectMultiScale(roi_Img, 1.1, 4)
-        if len(faces) == 0:
-            return None
-        else:
-            for (ex, ey, ew, eh) in faces:
-                img = roi_Img[ey: ey + eh, ex: ex + ew] 
+        # Ensure there's only one detected face to return
+        if len(faces) == 1:
+            RGBImg = cv2.cvtColor(roi_Img, cv2.COLOR_BGR2RGB)
+            RGBImg = cv2.resize(RGBImg, (img_shape, img_shape))
+            RGBImg = RGBImg / 255.
+            return RGBImg, img_base64
 
-    RGBImg = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    RGBImg = cv2.resize(RGBImg, (img_shape, img_shape))
-    RGBImg = RGBImg / 255.
-    return RGBImg, img_base64
+    print("Multiple faces detected")
+    return None, None
 
 # Function to predict and recommend songs
 def pred_and_recommend(image_file, class_names, genre):
     img, img_base64 = load_and_prep_image(image_file)
     if img is None:
-        return None, None
-    pred = ResNet50V2_Model.predict(np.expand_dims  (img, axis=0))
+        print("Image preprocessing failed")
+        return None, None, None
+    pred = ResNet50V2_Model.predict(np.expand_dims(img, axis=0))
     pred_class = class_names[pred.argmax()]
     songs = Recommend_Songs(pred_class, genre)
-    # Encode the image to base64 string
-    #_, img_encoded = cv2.imencode('.jpg', original_img)
-    #img_base64 = base64.b64encode(img_encoded).decode('utf-8')
-    return pred_class, songs, img_base64 
+    # Get Spotify access token
+    token = get_spotify_token()
+    song_links = []
+    for song in songs:
+        link = search_spotify(song, token)
+        song_links.append({'title': song, 'link': link})
+    return pred_class, song_links, img_base64 
 
 @app.route('/', methods=['GET'])
 def index():
@@ -113,22 +159,12 @@ def index():
 def predict():
     image_file = request.files['file']
     genre = request.form.get('genre')
-    #filepath = f'{file.filename}'
-    #print(filepath)
-    #filepath = f'static/{file.filename}'
-    #file.save(filepath)
     
     pred_class, songs, img_base64 = pred_and_recommend(image_file.stream, class_names, genre)
-    # Convert songs DataFrame to a list of dictionaries
-    if songs is not None and not songs.empty:
-        songs_list = songs.to_dict(orient='records')
-    else:
-        songs_list = []
-    songs_json = json.dumps(songs_list)
-        #if pred_class is None:
-    #    return jsonify({'songs': []})
-    #return jsonify({'songs': songs})
-    return jsonify({'class': pred_class, 'songs': songs_json, 'image': img_base64})
+    if pred_class is None:
+        return jsonify({'class': None, 'songs': [], 'image': None})
+
+    return jsonify({'class': pred_class, 'songs': songs, 'image': img_base64})
 
 if __name__ == '__main__':
     app.run(debug=True)
