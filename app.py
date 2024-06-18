@@ -22,7 +22,14 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 # Change the working directory to the script's directory
 os.chdir(script_dir)
 # Load the ResNet50V2 model
-ResNet50V2_Model = tf.keras.models.load_model('resnet.h5')
+ResNet50V2_Model = tf.keras.models.load_model('ResNet50V2_Model.h5')
+
+# or load the model architecture from JSON file
+
+# with open('model_arch.json', 'r') as json_file:
+#     loaded_model_json = json_file.read()
+# ResNet50V2_Model = tf.keras.models.model_from_json(loaded_model_json)
+ 
 
 # Load the dataset
 Music_Player = pd.read_csv('data_moods2.csv')
