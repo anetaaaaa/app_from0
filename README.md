@@ -1,9 +1,5 @@
 # Emotion based music recommendation 
 
-<div align="center">
-<img src="example_picture.jpg" height="1000"/>
-</div>
-
 Model for emotion recognition from kaggle: (https://www.kaggle.com/code/abduulrahmankhalid/emotion-based-music-recommender-resnet50v2/notebook).
 
 This is a web interface implemented on [Python](https://www.python.org) that uses a model to recognize emotion and recommend songs from Spotify.
