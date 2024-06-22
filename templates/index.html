@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Emotion Based Song Recommendation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Podkova:wght@400..800&display=swap" rel="stylesheet">
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -11,15 +15,16 @@
                 rgba(148, 56, 229, 0.326),
                 rgba(75, 75, 244, 0.79)
             ),
-            url("/static/picture.jpg");
+            url("/static/3569870.jpg");
             background-size: cover;
             color: #333;
             margin: 0;
             padding: 0;
         }
         h1 {
+            font-family: 'Podkova';
             text-align: center;
-            background-color: #7810be;
+            background-color: #0341b5;
             color: white;
             padding: 20px 0;
             margin: 0;
@@ -32,17 +37,22 @@
             background-color: rgba(255, 255, 255, 0.9);
             border-radius: 10px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            box-sizing: border-box;
         }
         label, button {
             display: block;
             width: 100%;
             margin-bottom: 10px;
         }
-        #captureButton, #genreInput {
+        #captureButton {
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        #genreInput {
             margin-bottom: 20px;
         }
         button {
-            background-color: #7810be;
+            background-color: #0341b5;
             color: white;
             padding: 10px;
             border: none;
@@ -53,11 +63,11 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
         button:hover {
-            background-color: #5b0098;
+            background-color: #042f7f;
             box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
         }
         button:active {
-            background-color: #7810be;
+            background-color: #0341b5;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
             transform: translateY(2px);
         }
@@ -113,6 +123,56 @@
         #video {
             display: block;
             margin: 0 auto;
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+        }
+
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 24px;
+                padding: 15px 0;
+            }
+            button {
+                font-size: 14px;
+                padding: 8px;
+            }
+            #capture-form {
+                padding: 15px;
+            }
+            #image-container {
+                margin: 10px auto;
+            }
+            #songs-container {
+                padding: 15px;
+            }
+            #songs-container h2 {
+                font-size: 20px;
+            }
+            #songs-container ul li {
+                font-size: 14px;
+            }
+            #songs-container ul li img {
+                width: 20px;
+                height: 20px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            h1 {
+                font-size: 20px;
+                padding: 10px 0;
+            }
+            button {
+                font-size: 12px;
+                padding: 6px;
+            }
+            #capture-form {
+                padding: 10px;
+            }
+            #songs-container h2 {
+                font-size: 18px;
+            }
         }
     </style>
 </head>
