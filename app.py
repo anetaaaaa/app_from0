@@ -75,12 +75,13 @@ def search_spotify(song_name, token):
 # Function to recommend songs
 def Recommend_Songs(pred_class, genre):
     if pred_class in ['Happy', 'Sad']:
-        Play = Music_Player[Music_Player['mood'] == 'Happy']
-    elif pred_class in ['Fear', 'Angry', 'Disgust']:
+        Play = Music_Player[Music_Player['mood'].isin(['Happy', 'Energetic'])]
+    elif pred_class in ['Fear', 'Angry']:
         Play = Music_Player[Music_Player['mood'] == 'Calm']
     elif pred_class in ['Surprise', 'Neutral']:
         Play = Music_Player[Music_Player['mood'] == 'Energetic']
-    
+    elif pred_class == 'Disgust':
+        Play = Music_Player
     Play = Play.sort_values(by="popularity", ascending=False)
     if genre == '' or genre is None:
         Play = Play[:5].reset_index(drop=True)
